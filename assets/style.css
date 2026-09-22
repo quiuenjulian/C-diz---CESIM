@@ -1,0 +1,286 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* ══════════════════════════════════════════════════════════════
+   VARIABLES DE MARCA — CÁDIZ AUTOMOTIVE
+   Inspirado en el dashboard de Geodefender (Grupo Randazzo): tipografía
+   limpia, cards redondeadas, jerarquía clara — con nuestra paleta
+   roja/grafito en vez del verde lima de esa plataforma.
+   ══════════════════════════════════════════════════════════════ */
+:root {
+    /* Adenda 25 (a pedido del equipo, mockup aprobado -- Opción B "Ciruela"): --brand-accent hacía
+       doble trabajo -- acento de marca/UI (pestañas, toggles, sliders) Y semántica de "crítico/
+       negativo" (alertas) -- por eso casi todo el tablero se leía como negativo con solo mirar el
+       color. Se separan en dos variables, cada una con un solo uso:
+         --color-cadiz    -- acento de MARCA/UI (identidad CADIZ, decorativo -- pestañas activas,
+                             toggles, sliders, borde de las tarjetas de KPI, título del sidebar).
+         --color-negative -- SOLO semántica negativo/crítico (alertas críticas). Mismo rojo que antes.
+       --brand-accent queda retirado -- si aparece en algún selector es una referencia vieja sin
+       migrar, no una tercera variable válida. */
+    --color-cadiz: #7C5CA8;       /* Lila Ciruela CÁDIZ */
+    --color-negative: #B3261E;    /* Rojo -- negativo/crítico */
+    --color-positive: #94D02D;    /* Verde lima -- positivo/favorable (Adenda 25, para las nuevas
+                                      tarjetas de KPI con doble delta -- mismo verde que ya usan
+                                      los gráficos en cascada de la app, no uno nuevo). */
+    --brand-dark: #1A1714;        /* Negro/Grafito */
+    --brand-light: #F5F2ED;       /* Crema */
+    --brand-secondary: #7A1913;   /* Rojo oscuro */
+
+    --border-soft: rgba(128, 128, 128, 0.16);
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* ══ BASE Y TIPOGRAFÍA ═════════════════════════════════════════ */
+html, body, .stApp {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+    letter-spacing: -0.006em;
+}
+h1 {
+    font-weight: 800 !important;
+    letter-spacing: -0.02em !important;
+    font-size: 1.7rem !important;
+}
+h2, h3, h4, h5, h6 {
+    font-weight: 600 !important;
+    letter-spacing: -0.01em !important;
+    opacity: 0.92;
+}
+h3 { font-size: 1.05rem !important; }
+.block-container { padding-top: 2.25rem !important; max-width: 1200px; }
+.stCaption, [data-testid="stCaptionContainer"] p { opacity: 0.55 !important; font-size: 0.8rem !important; }
+hr { opacity: 0.1 !important; margin: 0.5rem 0 1.25rem !important; }
+footer { visibility: hidden; }
+/* OJO: NO ocultar #MainMenu — ahí vive el selector nativo de tema (Light/Dark/Sistema) de Streamlit. */
+.stMarkdown strong { font-weight: 600; opacity: 0.9; }
+
+/* ══ SIDEBAR OSCURO ══════════════════════════════════════════════
+   Inspirado en el dashboard de Grupo Randazzo (sidebar oscuro + indicador
+   de estado) -- misma idea, con la marca CADIZ (grafito, no negro puro) en
+   vez de copiar su paleta. OJO: el menú desplegable de un selectbox/select_slider
+   se porta a veces fuera del <section> del sidebar (a nivel <body>) -- por eso
+   NO se intenta oscurecer el popover: haría lo mismo con todos los selects de
+   la app (los de las secciones, que quedan en fondo claro) y quedaría peor. */
+section[data-testid="stSidebar"] {
+    background-color: var(--brand-dark) !important;
+}
+section[data-testid="stSidebar"] * { color: var(--brand-light) !important; }
+section[data-testid="stSidebar"] h3 {
+    border-bottom: 3px solid var(--color-cadiz);
+    padding-bottom: 6px;
+    display: inline-block;
+    letter-spacing: 0.01em !important;
+    font-weight: 700 !important;
+    opacity: 1 !important;
+    font-size: 1rem !important;
+    color: #FFFFFF !important;
+}
+/* Las "cajas" de selectbox / select_slider necesitan su propio fondo -- si no,
+   quedan con el fondo transparente del sidebar y el texto claro se vuelve ilegible.
+   OJO -- gotcha verificado en vivo con Playwright: en esta versión de Streamlit el selectbox NO
+   usa data-baseweb="select" (esa versión vieja de BaseWeb quedó atrás) -- ahora es un
+   react-aria-ComboBox, y la caja blanca real es el DIV HIJO DIRECTO de esa clase. El selector viejo
+   nunca matcheaba: el texto salía en color claro (heredado del "*" de más arriba) sobre un fondo
+   blanco que quedaba intacto -- casi ilegible. Se dejan ambos selectores por las dudas de que
+   conviva algún widget con el markup viejo. */
+section[data-testid="stSidebar"] .react-aria-ComboBox > div,
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div,
+section[data-testid="stSidebar"] div[data-baseweb="base-input"] {
+    background-color: rgba(255, 255, 255, 0.07) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+}
+section[data-testid="stSidebar"] hr { border-color: rgba(255, 255, 255, 0.14) !important; opacity: 1 !important; }
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+/* Indicador de estado bajo el título, tipo "● Conectado" de la referencia -- acá
+   confirma ronda + tipo de ecosistema en foco en vez de ser solo decorativo. */
+.sidebar-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.82rem; font-weight: 600; opacity: 0.85 !important;
+    margin: -6px 0 16px 2px;
+}
+.sidebar-status .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background-color: #6FCF6F;
+    box-shadow: 0 0 0 3px rgba(111, 207, 111, 0.18);
+}
+
+/* ══ CARDS DE GRÁFICOS Y MÉTRICAS ═══════════════════════════════
+   Cards más redondeadas y con sombra sutil, como en Geodefender —
+   se despegan un poco más del fondo que el look "flat" anterior. */
+/* var(--secondary-background-color) no siempre esta definida: cuando no resuelve, el
+   background queda invalido y la card se ve transparente — de ahi que los KPIs se
+   leyeran como texto flotante. El segundo valor es el fallback. */
+div[data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="stMetric"] {
+    background-color: var(--secondary-background-color, rgba(128, 128, 128, 0.06)) !important;
+    border: 1px solid var(--border-soft) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-card) !important;
+}
+div[data-testid="stMetric"] {
+    border-left: 4px solid var(--color-cadiz) !important;
+    padding: 1rem 1.1rem !important;
+    min-height: 100px; /* cards parejas dentro de la misma fila de KPIs, con o sin delta */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+div[data-testid="stMetricValue"] { font-weight: 700 !important; font-size: 1.5rem !important; }
+/* Sin white-space:normal los titulos largos se cortaban con "..." y no se sabia que metrica era.
+   OJO: el elemento real es un <label>, no un <div> -- el selector "div[data-testid=...]" nunca
+   matcheaba y por eso el truncamiento seguia pasando pese a esta regla. Selector sin tag fijo. */
+[data-testid="stMetricLabel"] { font-weight: 600 !important; opacity: 0.62; font-size: 0.78rem !important; text-transform: uppercase; letter-spacing: 0.02em; white-space: normal !important; overflow: visible !important; line-height: 1.25 !important; }
+[data-testid="stMetricLabel"] * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+div[data-testid="stMetricDelta"] { font-size: 0.8rem !important; font-weight: 500 !important; }
+
+/* ══ TABS — pill style, como los botones de filtro de Geodefender ══ */
+.stTabs [data-baseweb="tab-list"] { gap: 4px; }
+.stTabs [data-baseweb="tab"] {
+    border-radius: 999px !important;
+    padding: 6px 16px !important;
+}
+/* El selector [aria-selected="true"] a secas pegaba en un nodo interno que no pinta fondo:
+   quedaba texto blanco sobre fondo blanco y la pestaña activa se volvía invisible en modo claro.
+   Hay que apuntar al botón de la pestaña, y forzar el color también en los hijos. */
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+    background-color: var(--color-cadiz) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+.stTabs [data-baseweb="tab"][aria-selected="true"] * {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+.stTabs [data-baseweb="tab-highlight"] { background-color: transparent !important; }
+.stTabs [data-baseweb="tab-border"] { display: none !important; }
+
+/* ══ RADIO / TOGGLE / SLIDER ═══════════════════════════════════ */
+div[role="radiogroup"] label:hover { background-color: rgba(124, 92, 168, 0.08) !important; border-radius: var(--radius-sm); }
+[data-testid="stToggle"] label div[data-checked="true"] { background-color: var(--color-cadiz) !important; }
+div[data-baseweb="slider"] div[role="slider"], div[data-baseweb="slider"] > div > div {
+    background-color: var(--color-cadiz) !important;
+    border-color: var(--color-cadiz) !important;
+}
+
+/* ══ ALERTAS — más redondeadas, en línea con el resto ══════════ */
+div[data-testid="stAlert"] { border-radius: var(--radius-sm) !important; }
+
+/* ══ EXPANDERS ═══════════════════════════════════════════════════ */
+details[data-testid="stExpander"] { border-radius: var(--radius-md) !important; border: 1px solid var(--border-soft) !important; }
+
+
+/* ══ BARRA SEGMENTADA (composición) ═════════════════════════════
+   Inspirada en las tarjetas "Estado de Asignación / Estado de Carga" del
+   dashboard de Grupo Randazzo -- ahí la proporción es sobre un universo fijo
+   (actas totales). Acá el total es la cantidad de alertas activas AHORA, no
+   un universo fijo de "reglas evaluadas" (una sola regla, ej. "I+D fuera de
+   lo común", puede dispararse 0 a 6 veces según cuántos rivales califiquen) --
+   por eso el rótulo dice "de las N alertas activas", nunca un % de un total
+   que no existe como tal. Ver panel_alertas() en app.py. */
+.stat-segment-card {
+    background-color: var(--secondary-background-color, rgba(128, 128, 128, 0.06));
+    border: 1px solid var(--border-soft); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card); padding: 1rem 1.15rem; margin-bottom: 1rem;
+}
+.stat-segment-label { font-weight: 600; opacity: 0.62; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 10px; }
+.stat-segment-bar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: rgba(128, 128, 128, 0.18); margin-bottom: 9px; }
+.stat-segment-bar .seg { height: 100%; }
+.stat-segment-bar .seg.critico { background-color: var(--color-negative); }
+.stat-segment-bar .seg.aviso   { background-color: #C9922E; }
+.stat-segment-bar .seg.ok      { background-color: #4E9A4E; }
+.stat-segment-legend { display: flex; gap: 20px; font-size: 0.85rem; font-weight: 600; }
+.stat-segment-legend .pt { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+.stat-segment-legend .critico { color: var(--color-negative); } .stat-segment-legend .critico .pt { background-color: var(--color-negative); }
+.stat-segment-legend .aviso   { color: #C9922E; } .stat-segment-legend .aviso .pt { background-color: #C9922E; }
+.stat-segment-legend .ok      { color: #4E9A4E; } .stat-segment-legend .ok .pt { background-color: #4E9A4E; }
+/* Variante "uso/libre": a diferencia de Estado de Alertas, acá el 100% SÍ es un universo fijo
+   real (capacidad instalada de la planta) -- ver seccion_operaciones() en app.py. "Usado" no es
+   ni identidad ni negativo/positivo (más uso de capacidad no es "malo" en sí) -- antes compartía
+   el rojo/lila de marca sin necesidad; ahora un azul neutro propio (Adenda 25). */
+.stat-segment-value { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+.stat-segment-bar .seg.uso    { background-color: #3E7CB1; }
+.stat-segment-bar .seg.libre  { background-color: rgba(128, 128, 128, 0.35); }
+.stat-segment-legend .uso     { color: #3E7CB1; } .stat-segment-legend .uso .pt   { background-color: #3E7CB1; }
+.stat-segment-legend .libre   { opacity: 0.65; } .stat-segment-legend .libre .pt { background-color: rgba(128, 128, 128, 0.5); }
+
+/* ══ PANEL DE ALERTAS ══════════════════════════════════════════ */
+.alerta-fila {
+    /* Base = severidad "crítico" (ver clases en panel_alertas(), app.py: 'critico' usa esta clase
+       sin modificador) -- semántica negativa, no identidad, así que usa --color-negative. */
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; margin-bottom: 6px;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--color-negative);
+    background-color: rgba(179, 38, 30, 0.07);
+    font-size: 0.88rem;
+}
+.alerta-fila.aviso { border-left-color: #C9922E; background-color: rgba(201, 146, 46, 0.07); }
+.alerta-fila.ok    { border-left-color: #4E9A4E; background-color: rgba(78, 154, 78, 0.07); }
+.alerta-fila b { font-weight: 600; }
+.alerta-fila span.detalle { opacity: 0.65; }
+
+/* ══ BANDA OSCURA DE KPIs CRÍTICOS ═══════════════════════════════
+   Inspirada en el bloque "Monto Pendiente / A vencer / Ya pagado" del
+   dashboard de Grupo Randazzo -- separa los 2-3 números que más le importan
+   a un accionista (Retorno, Beneficio, Capitalización) del resto de tarjetas
+   blancas, en vez de que compitan visualmente todas al mismo nivel. */
+.kpi-band-oscura {
+    background-color: var(--brand-dark);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    padding: 1.25rem 1.5rem;
+    display: flex; flex-wrap: wrap;
+    margin: 0.4rem 0 1.5rem;
+}
+.kpi-band-item { flex: 1; min-width: 190px; padding: 0 1.5rem; border-left: 1px solid rgba(255, 255, 255, 0.12); margin-bottom: 6px; }
+.kpi-band-item:first-child { border-left: none; padding-left: 0; }
+.kpi-band-label { color: rgba(245, 242, 237, 0.55); font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 8px; }
+.kpi-band-value { color: #FFFFFF; font-size: 1.9rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
+.kpi-band-delta { font-size: 0.82rem; font-weight: 600; }
+.kpi-band-delta.up   { color: #86D992; }
+.kpi-band-delta.down { color: #E68A72; }
+/* Con el TEMA NATIVO de Streamlit en oscuro, el resto de la página ya es oscura -- un panel
+   "más oscuro todavía" no se distingue de las tarjetas de al lado (verificado activando Dark desde
+   el menú de Streamlit: la banda literalmente desaparecía). Se resuelve distinguiendo por COLOR
+   (lila de marca, en vez de más oscuridad): vidrio esmerilado con tinte lila y borde del mismo tono
+   -- antes era rojo (Adenda 25: es identidad de marca, no negativo, así que pasa a --color-cadiz).
+   app.py agrega la clase "tema-oscuro" cuando es_modo_oscuro() es True. */
+.kpi-band-oscura.tema-oscuro {
+    background: linear-gradient(135deg, rgba(124, 92, 168, 0.32), rgba(124, 92, 168, 0.10));
+    border: 1px solid rgba(124, 92, 168, 0.45);
+}
+.kpi-band-oscura.tema-oscuro .kpi-band-item { border-left-color: rgba(255, 255, 255, 0.18); }
+
+/* ══ TARJETA KPI CON DOS DELTAS (vs. Ronda Anterior + vs. Industria) ════════════
+   Adenda 25 (a pedido del equipo: "no quiero ver solamente la variación vs el
+   promedio, que quede la variación con ronda anterior también, en todos los
+   casos"): st.metric solo admite UN delta, así que kpi_doble_delta() arma esta
+   card en HTML -- calcada del estilo de las cards st.metric nativas (mismo borde
+   izquierdo lila, fondo, borde y sombra -- ver div[data-testid="stMetric"] más
+   arriba) para que las dos convivan sin desentonar en la misma fila de columnas. */
+.kpi-card-doble {
+    background-color: var(--secondary-background-color, rgba(128, 128, 128, 0.06));
+    border: 1px solid var(--border-soft);
+    border-left: 4px solid var(--color-cadiz);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    padding: 1rem 1.1rem;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+.kpi-card-label { font-weight: 600; opacity: 0.62; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 2px; }
+.kpi-card-value { font-weight: 700; font-size: 1.5rem; letter-spacing: -0.01em; margin-bottom: 2px; }
+.kpi-card-delta { font-size: 0.8rem; font-weight: 500; line-height: 1.4; }
+.kpi-card-delta.up   { color: var(--color-positive); }
+.kpi-card-delta.down { color: var(--color-negative); }
+
+/* ══ CHIPS DE ESTRATEGIA ═══════════════════════════════════════ */
+.chip-estrategia {
+    display: inline-block; padding: 5px 12px; margin: 3px 4px 3px 0;
+    border-radius: 999px; font-size: 0.8rem; font-weight: 500; color: #FFFFFF;
+}
+.chip-estrategia.destacado { outline: 2px solid var(--brand-dark); outline-offset: 2px; font-weight: 700; }
