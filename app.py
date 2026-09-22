@@ -1243,7 +1243,7 @@ st.sidebar.divider()
 # que tocar otro control de la app.
 if st.sidebar.button('🔄 Actualizar tema', help='Usalo si cambiaste entre modo claro/oscuro en Settings y los colores de la app no se actualizaron solos.'):
     st.rerun()
-SECCIONES = ['Resultados', 'Mercado', 'Operaciones', 'Finanzas', 'RRHH y Sostenibilidad']
+SECCIONES = ['Resultados', 'Mercado', 'Operaciones', 'Finanzas', 'RRHH y Sostenibilidad', 'Control de Gestión']
 seccion = st.sidebar.radio('Sección', SECCIONES, key='select_seccion_router')
 df_all = get_data(filtro_tipo)
 if df_all.empty or ronda_snapshot not in df_all['Ronda'].unique():
@@ -1256,8 +1256,13 @@ if df_all.empty or ronda_snapshot not in df_all['Ronda'].unique():
     df_proy_bypass = get_proyeccion() if ronda_num_bypass is not None else None
     hay_proyeccion_cadiz = (df_proy_bypass is not None and not df_proy_bypass[
         (df_proy_bypass['round'] == ronda_num_bypass) & (df_proy_bypass['team'] == MY_COMPANY)].empty)
+    # Adenda 29: 'Control de Gestión' (nueva sección, home actual de Plan vs. Real) usa el mismo
+    # crosswalk que antes usaba Finanzas acá -- es el Nivel 1 de su narrativa (chart_bullet_panel,
+    # CROSSWALK_FINANZAS), el único nivel que tiene sentido mostrar sin ningún RDOS publicado todavía
+    # (los otros 2 niveles cruzan contra datos de mercado/fabricación que tampoco existen aún).
     _CROSSWALK_POR_SECCION_BYPASS = {'Finanzas': CROSSWALK_FINANZAS, 'Mercado': CROSSWALK_MERCADO,
-                                      'Operaciones': CROSSWALK_OPERACIONES, 'Resultados': CROSSWALK_RESULTADOS}
+                                      'Operaciones': CROSSWALK_OPERACIONES, 'Resultados': CROSSWALK_RESULTADOS,
+                                      'Control de Gestión': CROSSWALK_FINANZAS}
     if hay_proyeccion_cadiz and seccion in _CROSSWALK_POR_SECCION_BYPASS and empresa_analisis == MY_COMPANY:
         st.info(f"📁 CESIM todavía no publicó los RDOS de **{ronda_snapshot}** — el resto del tablero "
                 "no tiene datos para mostrar todavía, pero CADIZ ya cargó su proyección para esta "
@@ -1282,16 +1287,13 @@ except FileNotFoundError:
 # SECCIÓN 1 — RESULTADOS
 # =================================================================
 def seccion_resultado():
-    tab_resumen, tab_cg = st.tabs(['Resumen', 'Comparativa Plan vs. Real'])
-    with tab_resumen:
-        _seccion_resultado_resumen()
-    with tab_cg:
-        if empresa_analisis == MY_COMPANY:
-            panel_comparativa_plan_real(df_all.copy(), ronda_snapshot, crosswalk=CROSSWALK_RESULTADOS, key_suffix='resultados', mostrar_directo=True)
-            st.divider()
-            fila3_resultados_ingresos(df_all.copy(), ronda_snapshot, ronda_a_num(ronda_snapshot), get_proyeccion())
-        else:
-            st.caption('Cambiá "Equipo en foco" a CADIZ en la barra lateral para ver la Comparativa Plan vs. Real (es sobre la proyección propia de CADIZ).')
+    # Adenda 29 (a pedido del equipo, "Control de Gestión" centralizado): la sub-pestaña
+    # 'Comparativa Plan vs. Real' que vivía acá se elimina -- esta sección queda enfocada solo en el
+    # análisis operativo/competitivo de la ronda (los 7 equipos). El desvío Plan vs. Real de CADIZ
+    # (panel_comparativa_plan_real + fila3_resultados_ingresos, que se llamaban desde acá) ahora vive
+    # consolidado en la sección propia 'Control de Gestión' (Nivel 2 de esa narrativa), sin perder
+    # ningún gráfico -- ver seccion_control_gestion() más abajo.
+    _seccion_resultado_resumen()
 def _seccion_resultado_resumen():
     val_ronda = df[(df['Estado'] == 'Valuación - Global') & (df['Ronda'] == ronda_snapshot)]
     ratios_ronda_r1 = df[(df['Estado'] == 'Ratios e indicadores financieros clave') & (df['Ronda'] == ronda_snapshot)]
@@ -1548,16 +1550,13 @@ def _seccion_resultado_resumen():
 # SECCIÓN 2 — MERCADO
 # =================================================================
 def seccion_mercado():
-    tab_pos, tab_pan, tab_evo, tab_cg = st.tabs(['Posicionamiento', 'Panorama Competitivo', 'Evolución', 'Comparativa Plan vs. Real'])
+    # Adenda 29 (a pedido del equipo, "Control de Gestión" centralizado): se elimina la sub-pestaña
+    # 'Comparativa Plan vs. Real' -- ver mismo comentario en seccion_resultado(). El desvío de cuota
+    # (panel_comparativa_plan_real + fila3_mercado_cuota_objetivo) pasa al Nivel 2 de 'Control de
+    # Gestión'. En su lugar se suma 'Evolución Macro de la Industria' (nueva, a pedido del equipo):
+    # vista de mercado agregada, sin segmentar por tecnología, con los 7 equipos sumados.
+    tab_pos, tab_pan, tab_evo, tab_macro = st.tabs(['Posicionamiento', 'Panorama Competitivo', 'Evolución', 'Evolución Macro de la Industria'])
     tecnologias = ['Combustión', 'Híbrido', 'Eléctrico', 'Hidrógeno']
-
-    with tab_cg:
-        if empresa_analisis == MY_COMPANY:
-            panel_comparativa_plan_real(df_all.copy(), ronda_snapshot, crosswalk=CROSSWALK_MERCADO, key_suffix='mercado', mostrar_directo=True)
-            st.divider()
-            fila3_mercado_cuota_objetivo(df_all.copy(), ronda_snapshot, ronda_a_num(ronda_snapshot), get_proyeccion())
-        else:
-            st.caption('Cambiá "Equipo en foco" a CADIZ en la barra lateral para ver la Comparativa Plan vs. Real (es sobre la proyección propia de CADIZ).')
 
     with tab_pos:
         c1, c2 = st.columns(2)
@@ -1785,18 +1784,158 @@ def seccion_mercado():
         # de verdad que quedaba en la app (el resto ya se había migrado a paneles apilados, ver
         # chart_dos_metricas_apiladas) -- señalado como pendiente en la Adenda 18 y sacado a pedido
         # explícito del equipo.
+
+    with tab_macro:
+        # Adenda 29 (a pedido del equipo, "vista estratégica de Mercado"): NUEVO -- a diferencia del
+        # resto de la sección (que siempre corta por tecnología y/o por equipo), acá se ve la
+        # industria entera (7 equipos, 4 tecnologías) sumada, para responder "¿el mercado crece por
+        # volumen o por precio?" sin ese detalle.
+        st.caption('Los 7 equipos y las 4 tecnologías sumados -- para ver si el negocio crece por '
+                   'volumen o por precio, sin el detalle de tecnología/equipo de las otras pestañas.')
+        paises_macro = ['EE.UU.', 'China', 'Europa']
+
+        def _industria_volumen_valor(paises_incluir):
+            """Volumen (miles u.) y Valoración (USD) de toda la industria (7 equipos, todas las
+            tecnologías), sumados sobre `paises_incluir`, por ronda.
+
+            Valoración: NO se calcula como 'Precio de venta' nativo × Volumen -- el Precio de venta
+            que publica CESIM está en USD solo en EE.UU.; en China está en RMB y en Europa en EUR
+            (ver Metrica 'Precio de venta, RMB' / 'Precio de venta, EUR' en cesim_parser). Convertir
+            eso a USD acá asumiría un tipo de cambio que el RDOS no publica -- justo lo que se evita
+            en toda la app (ver fila3_resultados_ingresos, que por eso muestra el waterfall de
+            Ingresos en moneda nativa, sin convertir).
+            En cambio se usa 'Ingresos por ventas' (Estado='Cuenta de resultados, miles USD, {país}',
+            Sección 'Ingresos por ventas') -- CESIM YA reporta esa cifra en USD para las 3 regiones
+            (el título de la hoja lo dice, 'miles USD', incluso para China/Europa: es la cifra que el
+            propio simulador usa para consolidar el P&L Global). Verificado contra los RDOS reales de
+            CADIZ (R0-R3): sumar 'de mercados' (EE.UU./China, único componente que es venta real a
+            consumidor) + 'Ingresos por ventas' (Europa, que al no tener fábrica propia no tiene el
+            desglose 'de mercados' / 'de transferencias internas') reconcilia EXACTO con 'Cuenta de
+            resultados, miles USD, Global' de cada equipo/ronda. Se excluye 'de transferencias
+            internas' (envíos entre áreas productivas, no venta a consumidor final) y el subtotal
+            'Beneficio de Ventas Totales' (= 'de mercados' + 'de transferencias internas' exacto --
+            un artefacto de la celda combinada del RDOS al parsear, no una tercera cifra)."""
+            vol = df[(df['Estado'].isin([f'Informe de mercado, {p}' for p in paises_incluir])) &
+                     (df['Metrica'] == 'Ventas, miles unidades')].copy()
+            vol['Valor'] = num(vol['Valor'])
+            vol_r = vol.groupby(['Ronda', 'Ronda_Orden'], as_index=False)['Valor'].sum().rename(columns={'Valor': 'Volumen'})
+            val = df[(df['Estado'].isin([f'Cuenta de resultados, miles USD, {p}' for p in paises_incluir])) &
+                     (df['Seccion'] == 'Ingresos por ventas') &
+                     (df['Metrica'].isin(['de mercados', 'Ingresos por ventas']))].copy()
+            val['Valor'] = num(val['Valor'])
+            val_r = val.groupby(['Ronda', 'Ronda_Orden'], as_index=False)['Valor'].sum().rename(columns={'Valor': 'Valoracion'})
+            return vol_r.merge(val_r, on=['Ronda', 'Ronda_Orden'], how='outer').sort_values('Ronda_Orden')
+
+        def _chart_linea_industria(serie, columna, titulo, color, sufijo=''):
+            d = serie.dropna(subset=[columna])
+            if d.empty:
+                return st.info(f'Sin datos para graficar "{titulo}".')
+            fig = go.Figure(go.Scatter(x=d['Ronda'], y=d[columna], mode='lines+markers', name=titulo,
+                                        line=dict(color=color, width=3), marker=dict(size=7),
+                                        hovertemplate=f'%{{x}} — %{{y:,.0f}}{sufijo}<extra></extra>'))
+            fig.update_layout(title=titulo, showlegend=False)
+            mostrar(fig)
+
+        st.markdown('###### Evolución Global — toda la industria')
+        serie_global = _industria_volumen_valor(paises_macro)
+        cgm1, cgm2 = st.columns(2)
+        with cgm1:
+            _chart_linea_industria(serie_global, 'Volumen', 'Volumen total, miles de unidades', MUTED_PALETTE[0], sufijo=' mil u.')
+        with cgm2:
+            _chart_linea_industria(serie_global, 'Valoracion', 'Valoración total, USD', COLOR_METRICA['dinero'])
+
+        st.divider()
+        st.markdown('###### Evolución Regional')
+        pais_macro_sel = st.selectbox('Mercado', paises_macro, key='sel_mercado_macro_pais')
+        serie_regional = _industria_volumen_valor([pais_macro_sel])
+        crm1, crm2 = st.columns(2)
+        with crm1:
+            _chart_linea_industria(serie_regional, 'Volumen', f'Volumen — {pais_macro_sel}, miles de unidades', MUTED_PALETTE[0], sufijo=' mil u.')
+        with crm2:
+            _chart_linea_industria(serie_regional, 'Valoracion', f'Valoración — {pais_macro_sel}, USD', COLOR_METRICA['dinero'])
+        st.caption('Volumen y Valoración por separado (nunca en el mismo eje) para no sugerir una '
+                   'correlación entre las dos series que no está probada -- si crecen a ritmos '
+                   'distintos, ese es justo el dato: el mercado crece más por precio que por volumen, '
+                   'o viceversa.')
+
+        st.divider()
+        st.markdown('###### Ventas de la Industria vs. Demanda Insatisfecha')
+        st.caption('Escala Global (los 3 mercados sumados). "Demanda potencial insatisfecha" es '
+                   'terminología del propio manual CESIM (sección de Producto: "la demanda potencial '
+                   'insatisfecha o el inventario final") = Demanda − Ventas, sumada entre los 7 equipos '
+                   'y las 4 tecnologías -- volumen que el mercado hubiera comprado pero que algún '
+                   'competidor (no necesariamente CADIZ) no tuvo suficiente producto disponible para '
+                   'vender esa ronda. Es un síntoma agregado de toda la industria, no atribuye la causa '
+                   'puntual de cada equipo (puede ser capacidad instalada, una decisión de producción, o '
+                   'importación insuficiente).')
+
+        def _industria_demanda_insatisfecha(paises_incluir):
+            dem = df[(df['Estado'].isin([f'Informe de mercado, {p}' for p in paises_incluir])) &
+                     (df['Metrica'] == 'Demanda, miles unidades')].copy()
+            ven = df[(df['Estado'].isin([f'Informe de mercado, {p}' for p in paises_incluir])) &
+                     (df['Metrica'] == 'Ventas, miles unidades')].copy()
+            dem['Valor'] = num(dem['Valor']); ven['Valor'] = num(ven['Valor'])
+            dem_r = dem.groupby(['Ronda', 'Ronda_Orden'], as_index=False)['Valor'].sum().rename(columns={'Valor': 'Demanda'})
+            ven_r = ven.groupby(['Ronda', 'Ronda_Orden'], as_index=False)['Valor'].sum().rename(columns={'Valor': 'Ventas'})
+            out = dem_r.merge(ven_r, on=['Ronda', 'Ronda_Orden'], how='outer').sort_values('Ronda_Orden')
+            out['Insatisfecha'] = (out['Demanda'] - out['Ventas']).clip(lower=0)
+            return out
+
+        serie_ins = _industria_demanda_insatisfecha(paises_macro)
+        if serie_ins.dropna(subset=['Demanda']).empty:
+            st.info('Sin datos de demanda/ventas para graficar.')
+        else:
+            fig_ins = go.Figure()
+            fig_ins.add_trace(go.Bar(x=serie_ins['Ronda'], y=serie_ins['Ventas'], name='Ventas de la industria',
+                                      marker_color=COLOR_METRICA['eficiencia']))
+            fig_ins.add_trace(go.Bar(x=serie_ins['Ronda'], y=serie_ins['Insatisfecha'], name='Demanda insatisfecha',
+                                      marker_color=COLOR_METRICA['riesgo']))
+            fig_ins.update_layout(barmode='stack', title='Ventas vs. Demanda Insatisfecha, miles de unidades',
+                                   legend=dict(orientation='h', yanchor='top', y=-0.2, xanchor='center', x=0.5))
+            mostrar(fig_ins, margen_b=70)
+
+        st.divider()
+        st.markdown('###### Mix de Demanda Real — % de cada tecnología sobre la demanda total, por región')
+        st.caption('Sobre la Demanda (no la Ventas) de los 7 equipos sumados en cada mercado -- el tamaño '
+                   'de la torta de cada tecnología en cada región, más allá de quién se la reparte.')
+
+        def _mix_demanda_real(pais):
+            d = df[(df['Estado'] == f'Informe de mercado, {pais}') & (df['Metrica'] == 'Demanda, miles unidades')].copy()
+            d['Valor'] = num(d['Valor'])
+            por_tech = d.groupby(['Ronda', 'Ronda_Orden', 'Seccion'], as_index=False)['Valor'].sum()
+            total = por_tech.groupby(['Ronda', 'Ronda_Orden'], as_index=False)['Valor'].sum().rename(columns={'Valor': 'Total'})
+            m = por_tech.merge(total, on=['Ronda', 'Ronda_Orden'])
+            m['Pct'] = np.where(m['Total'] > 0, m['Valor'] / m['Total'] * 100, np.nan)
+            return m.sort_values('Ronda_Orden').rename(columns={'Seccion': 'Tecnología'})
+
+        color_tech_mix = dict(zip(tecnologias, MUTED_SIN_MARRON))
+        cols_mix_macro = st.columns(3)
+        for i, pais_mix in enumerate(paises_macro):
+            mix_m = _mix_demanda_real(pais_mix)
+            with cols_mix_macro[i]:
+                if mix_m.dropna(subset=['Pct']).empty:
+                    st.info(f'Sin datos en {pais_mix}.')
+                    continue
+                fig_mix_m = go.Figure()
+                for tech in tecnologias:
+                    d_t = mix_m[mix_m['Tecnología'] == tech]
+                    if d_t.empty:
+                        continue
+                    fig_mix_m.add_trace(go.Scatter(x=d_t['Ronda'], y=d_t['Pct'], name=tech, mode='lines',
+                                                    stackgroup='uno', line=dict(width=0.5, color=color_tech_mix[tech]),
+                                                    fillcolor=_hex_a_rgba(color_tech_mix[tech], 0.75)))
+                fig_mix_m.update_layout(title=pais_mix, yaxis=dict(ticksuffix='%', range=[0, 100]),
+                                         legend=dict(orientation='h', yanchor='top', y=-0.35, xanchor='center', x=0.5))
+                mostrar(fig_mix_m, margen_b=95)
 # =================================================================
 # SECCIÓN 3 — OPERACIONES
 # =================================================================
 def seccion_operaciones():
-    bloque1, bloque2, tab_cg = st.tabs(['Capacidad y Costos', 'Inventario y Logística', 'Comparativa Plan vs. Real'])
-    with tab_cg:
-        if empresa_analisis == MY_COMPANY:
-            panel_comparativa_plan_real(df_all.copy(), ronda_snapshot, crosswalk=CROSSWALK_OPERACIONES, key_suffix='operaciones', mostrar_directo=True)
-            st.divider()
-            fila3_operaciones_gap_fabricacion(df_all.copy(), ronda_snapshot, ronda_a_num(ronda_snapshot), get_proyeccion())
-        else:
-            st.caption('Cambiá "Equipo en foco" a CADIZ en la barra lateral para ver la Comparativa Plan vs. Real (es sobre la proyección propia de CADIZ).')
+    # Adenda 29 (a pedido del equipo, "Control de Gestión" centralizado): se elimina la sub-pestaña
+    # 'Comparativa Plan vs. Real' -- ver mismo comentario en seccion_resultado(). El desvío fabril
+    # (panel_comparativa_plan_real + fila3_operaciones_gap_fabricacion) pasa al Nivel 3 de 'Control
+    # de Gestión'.
+    bloque1, bloque2 = st.tabs(['Capacidad y Costos', 'Inventario y Logística'])
     with bloque1:
         cap = df[(df['Estado'] == 'Detalles de fabricación') & (df['Seccion'] == 'Capacidad empleada, %') & (df['Empresa'] == empresa_analisis) & (df['Ronda'] == ronda_snapshot) & (df['Subgrupo'].isin(['EE.UU.', 'China']))].copy()
         cap['Valor'] = num(cap['Valor'])
@@ -2188,9 +2327,11 @@ def seccion_finanzas():
     #  D) Se reincorpora un badge de "Spread de Creación de Valor" (ROCE − WACC) y se agrega un
     #     gráfico nuevo de "Composición de Estructura de Capital" (ponderación Deuda/Patrimonio del
     #     propio cálculo de WACC) -- los dos, debajo de los 3 KPIs de WACC/ROCE/Deuda LP.
-    #  E) panel_comparativa_plan_real(): se llama con mostrar_metricas=False solo desde acá -- saca
-    #     la Fila 1 de tarjetas st.metric y deja solo el panel de barras horizontales apiladas como
-    #     elemento protagonista (ver comentario en la definición de esa función).
+    #  E) panel_comparativa_plan_real(): se llama con mostrar_metricas=False -- saca la Fila 1 de
+    #     tarjetas st.metric y deja solo el panel de barras horizontales apiladas como elemento
+    #     protagonista (ver comentario en la definición de esa función). [Adenda 29: ese llamado ya
+    #     no vive acá -- se movió al Nivel 1 de la nueva sección 'Control de Gestión', con el mismo
+    #     criterio mostrar_metricas=False/mostrar_extras=False.]
     #  DECISIÓN DE LAYOUT PROPIA (no especificada por el equipo, a flagear): con Balance, Rango de
     #  Industria y los KPIs de Largo Plazo promovidos al bloque fijo de arriba, y con "Costo de la
     #  deuda"/"Matriz Riesgo-Retorno"/"Beneficio Neto vs Deuda" eliminados, la pestaña "Largo Plazo:
@@ -2218,10 +2359,12 @@ def seccion_finanzas():
             return None
         return (val - prom) / abs(prom) * 100
 
-    # Adenda 26: pestañas al TOPE de la sección, antes de cualquier tarjeta -- ver punto (A) arriba.
-    tab_finanzas, tab_cg = st.tabs(['Finanzas', 'Comparativa Plan vs. Real'])
-
-    with tab_finanzas:
+    # Adenda 29 (a pedido del equipo, "Control de Gestión" centralizado): ya no hace falta la
+    # pestaña -- con 'Comparativa Plan vs. Real' movida a su propia sección (ver comentario más
+    # abajo, donde vivía tab_cg), esta sección vuelve a tener un solo contenido; se cambia el
+    # st.tabs(...) de la Adenda 26 por un contenedor simple para no dejar una tira de UNA sola
+    # pestaña (sin cambiar la indentación del cuerpo de abajo).
+    with st.container():
         # ---- KPIs principales: Precio Acción / Capitalización / EPS ----
         precio_vals = {e: valor_de(ratios_ronda, 'Precio de la acción al final de la ronda, USD', e) for e in COMPANIES}
         cap_vals = {e: valor_de(val_ronda, 'Capitalización de mercado, miles USD', e) for e in COMPANIES}
@@ -2534,23 +2677,12 @@ def seccion_finanzas():
         else:
             st.info('Ningún equipo tomó deuda de corto plazo no planificada en esta ronda.')
 
-    # Control de Gestión: es inherentemente sobre CADIZ (es nuestra propia proyección, no la de
-    # "Equipo en foco") -- si se está mirando otro equipo, se avisa en vez de mostrar el gap de
-    # CADIZ sin aclarar de quién es. Convertido de toggle suelto a pestaña (Adenda 11) por
-    # consistencia con Resultados/Mercado/Operaciones, que ahora tienen la misma pestaña.
-    with tab_cg:
-        if empresa_analisis == MY_COMPANY:
-            # Adenda 26/27 (a pedido del equipo: "eliminar todo esos gráficos de comparativa vs
-            # real en finanzas, solo nos quedamos con la de comparativa vs real de barras
-            # horizontales"): mostrar_metricas=False + mostrar_extras=False dejan ÚNICAMENTE el
-            # panel chart_bullet_panel -- ver comentario en panel_comparativa_plan_real().
-            panel_comparativa_plan_real(df, ronda_snapshot, key_suffix='finanzas', mostrar_directo=True,
-                                         mostrar_metricas=False, mostrar_extras=False)
-            # Adenda 25 (a pedido del equipo: "en comparativa vs real: solo dejamos las barras
-            # laterales de proyectado vs real por ahora"): se saca el llamado a
-            # fila3_finanzas_flujo_caja() (el puente CFO->CFI->CFF) que iba acá.
-        else:
-            st.caption('Cambiá "Equipo en foco" a CADIZ en la barra lateral para ver la Comparativa Plan vs. Real.')
+    # Adenda 29 (a pedido del equipo, "Control de Gestión" centralizado): se elimina la pestaña
+    # 'Comparativa Plan vs. Real' -- ver mismo comentario en seccion_resultado(). El panel de barras
+    # horizontales (chart_bullet_panel con CROSSWALK_FINANZAS) pasa al Nivel 1 de 'Control de
+    # Gestión', con el mismo criterio de esta Adenda 26/27 (mostrar_metricas=False,
+    # mostrar_extras=False -- SOLO el panel, sin reactivar fila3_finanzas_flujo_caja(), el puente
+    # CFO->CFI->CFF, que sigue definida sin uso más arriba por si se retoma).
     # =================================================================
     # SECCIÓN 5 — RRHH Y SOSTENIBILIDAD
     # =================================================================
@@ -2682,6 +2814,45 @@ def seccion_rrhh_sostenibilidad():
             mostrar(fig_bal)
         else:
             st.info('Sin datos de "Impactos en la demanda" para esta ronda.')
+# =================================================================
+# SECCIÓN 6 — CONTROL DE GESTIÓN
+# =================================================================
+def seccion_control_gestion():
+    """Adenda 29 (a pedido del equipo): antes 'Comparativa Plan vs. Real' vivía repartida en una
+    sub-pestaña de Resultados/Mercado/Operaciones/Finanzas, cada una mostrando el desvío de SU
+    propio recorte (Ingresos, Cuota, Costo fabril, KPIs financieros) sin conexión entre sí. Acá se
+    arma la misma información -- sin sacar ningún gráfico -- como una única narrativa secuencial de
+    3 niveles, de lo más agregado a lo más específico:
+      Nivel 1 (Impacto Financiero Macro): panel compacto de KPIs financieros (EBITDA, ROS, etc.).
+      Nivel 2 (Desvío Comercial e Ingresos): waterfall Precio/Volumen/Mix + Cuota Proyectada vs Real.
+      Nivel 3 (Desvío Fabril y de Costos): waterfall de costo unitario de fabricación por área.
+    Es inherentemente sobre CADIZ (es nuestra propia proyección en el modelo de gestión, no la de
+    'Equipo en foco') -- si se está mirando otro equipo, se avisa en vez de mostrar el gap de CADIZ
+    sin aclarar de quién es (mismo criterio que ya usaba cada sub-pestaña vieja)."""
+    if empresa_analisis != MY_COMPANY:
+        st.caption('Control de Gestión es sobre la proyección propia de CADIZ en el modelo de gestión — '
+                   'cambiá "Equipo en foco" a CADIZ en la barra lateral para verlo.')
+        return
+    df_proy_cg = get_proyeccion()
+    ronda_num_cg = ronda_a_num(ronda_snapshot)
+
+    st.markdown('#### Nivel 1 — Impacto Financiero Macro')
+    # mostrar_metricas=False + mostrar_extras=False: SOLO el panel de barras horizontales
+    # (chart_bullet_panel, CROSSWALK_FINANZAS) -- mismo criterio que ya pedía el equipo en Finanzas
+    # (Adenda 26/27). NO se reactiva fila3_finanzas_flujo_caja() (el puente CFO->CFI->CFF): sigue
+    # definida sin uso más arriba, a pedido explícito de Mati para esta reorganización.
+    panel_comparativa_plan_real(df_all.copy(), ronda_snapshot, crosswalk=CROSSWALK_FINANZAS, key_suffix='cg_nivel1',
+                                 mostrar_directo=True, mostrar_metricas=False, mostrar_extras=False)
+
+    st.divider()
+    st.markdown('#### Nivel 2 — Desvío Comercial e Ingresos')
+    fila3_resultados_ingresos(df_all.copy(), ronda_snapshot, ronda_num_cg, df_proy_cg)
+    st.divider()
+    fila3_mercado_cuota_objetivo(df_all.copy(), ronda_snapshot, ronda_num_cg, df_proy_cg)
+
+    st.divider()
+    st.markdown('#### Nivel 3 — Desvío Fabril y de Costos')
+    fila3_operaciones_gap_fabricacion(df_all.copy(), ronda_snapshot, ronda_num_cg, df_proy_cg)
 # ---------------- Router ----------------
 st.title(seccion)
 if seccion == SECCIONES[0]: seccion_resultado()
@@ -2689,3 +2860,4 @@ elif seccion == SECCIONES[1]: seccion_mercado()
 elif seccion == SECCIONES[2]: seccion_operaciones()
 elif seccion == SECCIONES[3]: seccion_finanzas()
 elif seccion == SECCIONES[4]: seccion_rrhh_sostenibilidad()
+elif seccion == SECCIONES[5]: seccion_control_gestion()
